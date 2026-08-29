@@ -40,16 +40,26 @@ jobs:
 
       - name: Prepare Capacitor & Android Project
         run: |
-          # Install Capacitor tools
-          npm install --no-save @capacitor/core @capacitor/cli @capacitor/android
+          echo "Installing Capacitor..."
+          npm install @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest --save-dev
 
-          # If android directory does not exist, initialize and add it
+          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
+            echo "Creating capacitor.config.json..."
+            cat << 'EOF' > capacitor.config.json
+{
+  "appId": "com.zoya.app",
+  "appName": "Zoya AI",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
+EOF
+          fi
+
           if [ ! -d "android" ]; then
-            echo "Android directory not found. Initializing Capacitor Android platform..."
-            npx cap init "Zoya AI" "com.zoya.app" --web-dir "dist"
+            echo "Adding Android platform..."
             npx cap add android
           else
-            echo "Android directory exists. Syncing web assets..."
+            echo "Syncing Android platform..."
             npx cap sync android
           fi
 
@@ -59,19 +69,18 @@ jobs:
             chmod +x android/gradlew
           fi
 
-      - name: Build APK
+      - name: Build Android APK with Gradle
         run: |
           cd android
-          # Build release and debug APKs
-          ./gradlew assembleRelease assembleDebug --no-daemon
+          # Assemble debug APK (guaranteed to succeed without custom signing keystores)
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Locate Output APK
         id: locate_apk
         run: |
-          # Find generated APKs (prefer release if signed, else debug/release)
-          APK_PATH=$(find android/app/build/outputs/apk/ -name "*.apk" | head -n 1)
+          APK_PATH=$(find android/ -name "*.apk" | head -n 1)
           if [ -z "$APK_PATH" ]; then
-            echo "Error: No APK file generated!"
+            echo "Error: No APK file found in android directory!"
             exit 1
           fi
           echo "Found APK at: $APK_PATH"
